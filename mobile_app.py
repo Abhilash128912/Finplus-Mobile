@@ -258,8 +258,22 @@ if not st.session_state.cloud_url:
 # FETCH/REFRESH LEDGER
 # -----------------------------
 if st.session_state.ledger_data is None:
-    data = load_from_cloud(st.session_state.cloud_url, st.session_state.cloud_secret)
-    if data:
+    data, success = load_from_cloud(st.session_state.cloud_url, st.session_state.cloud_secret)
+    if success:
+        if data is None:
+            data = {
+                "owner_name": "Abhilash",
+                "accounts": {name: {"type": typ, "parent": None} for name, typ in DEFAULT_COA.items()},
+                "journal_entries": [],
+                "gold_qty": 177.0,
+                "password": "finance@2026",
+                "security_question": "What is the owner name of this finance ledger?",
+                "security_answer": "Abhilash",
+                "cloud_sync_enabled": True,
+                "cloud_url": st.session_state.cloud_url,
+                "cloud_secret": st.session_state.cloud_secret
+            }
+            save_to_cloud(data, st.session_state.cloud_url, st.session_state.cloud_secret)
         st.session_state.ledger_data = data
     else:
         st.error("❌ Failed to load cloud data. Verify settings or retry.")
