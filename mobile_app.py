@@ -106,6 +106,51 @@ h2, h3, h5 {
 </style>
 """, unsafe_allow_html=True)
 
+DEFAULT_COA = {
+    "Cash": "Asset",
+    "Punjab National Bank": "Asset",
+    "Jio Payment Bank": "Asset",
+    "Stock Market Asset": "Asset",
+    "Gold Asset": "Asset",
+    "BlinkX Account": "Asset",
+    "INDmoney Account": "Asset",
+    "Mutual Fund": "Asset",
+    "KSFE Sugama Account 004000010006313": "Asset",
+    "Bajaj Loan": "Liability",
+    "PNB Gold Loan": "Liability",
+    "KSFE Gold Loan": "Liability",
+    "Chitty Liability": "Liability",
+    "Credit Card": "Liability",
+    "KSFE GOLD LOAN 00400120052099": "Liability",
+    "KSFE GOLD LOAN 00400120052097": "Liability",
+    "KSFE GOLD LOAN 00400120052100": "Liability",
+    "Accrued Interest(KSFE Gold Loan)": "Liability",
+    "Accrued Interest(PNB Gold Loan)": "Liability",
+    "Retained Earnings": "Equity",
+    "Opening Balance Equity": "Equity",
+    "Salary": "Revenue",
+    "Stock Market Gains": "Revenue",
+    "Bank Interest Received": "Revenue",
+    "Trading Income": "Revenue",
+    "Gold Loan PNB Interest": "Expense",
+    "Chitty": "Expense",
+    "KSFE Interest Tiers": "Expense",
+    "Innamma": "Expense",
+    "Other Expenses": "Expense",
+    "Stock Market Loss": "Expense",
+    "Groceries": "Expense",
+    "Refershment": "Expense",
+    "Travelling Expense(Petrol)": "Expense",
+    "Travelling Expense(Radhu)": "Expense",
+    "Shopping": "Expense",
+    "Mobile Expenses": "Expense",
+    "Bank Charges": "Expense",
+    "Bank Interest": "Expense",
+    "Trading Loss": "Expense",
+    "Subscription": "Expense",
+    "KSFE Gold Loan Interest": "Expense"
+}
+
 # -----------------------------
 # CLOUD BACKEND SYNC HELPERS
 # -----------------------------
@@ -123,10 +168,10 @@ def load_from_cloud(url, secret):
             
         response = requests.get(fetch_url, params=params, timeout=8)
         if response.status_code == 200:
-            return response.json()
+            return response.json(), True
     except Exception:
         pass
-    return None
+    return None, False
 
 def save_to_cloud(payload, url, secret):
     try:
@@ -181,10 +226,25 @@ if not st.session_state.cloud_url:
         if url_input.strip():
             url_clean = url_input.strip()
             secret_clean = secret_input.strip()
-            data = load_from_cloud(url_clean, secret_clean)
-            if data:
+            data, success = load_from_cloud(url_clean, secret_clean)
+            if success:
                 st.session_state.cloud_url = url_clean
                 st.session_state.cloud_secret = secret_clean
+                if data is None:
+                    # Initialize default database structure since it was empty
+                    data = {
+                        "owner_name": "Abhilash",
+                        "accounts": {name: {"type": typ, "parent": None} for name, typ in DEFAULT_COA.items()},
+                        "journal_entries": [],
+                        "gold_qty": 177.0,
+                        "password": "finance@2026",
+                        "security_question": "What is the owner name of this finance ledger?",
+                        "security_answer": "Abhilash",
+                        "cloud_sync_enabled": True,
+                        "cloud_url": url_clean,
+                        "cloud_secret": secret_clean
+                    }
+                    save_to_cloud(data, url_clean, secret_clean)
                 st.session_state.ledger_data = data
                 st.success("✅ Successfully linked to database!")
                 st.rerun()
