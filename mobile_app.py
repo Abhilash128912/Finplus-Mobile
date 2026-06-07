@@ -66,9 +66,38 @@ html, body, [class*="css"] {
 }
 
 /* ─── MOBILE ACCENTS & INPUTS ───────────────────────────────────────── */
+.stTextInput input,
+.stNumberInput input,
+.stDateInput input,
+textarea {
+    background: #FFFFFF !important;
+    color: #0F172A !important;
+    border: 1px solid #CBD5E1 !important;
+    border-radius: 10px !important;
+}
+div[data-baseweb="base-input"],
+.stNumberInput div[data-baseweb="input"] {
+    background: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
+    border-radius: 10px !important;
+}
+div[data-baseweb="select"] > div,
+div[data-baseweb="select"] > div > div {
+    background: #FFFFFF !important;
+    color: #0F172A !important;
+    border: 1px solid #CBD5E1 !important;
+    border-radius: 10px !important;
+}
+div[data-baseweb="select"] * { color: #0F172A !important; }
+div[data-baseweb="select"] svg { fill: #64748B !important; }
+input::placeholder { color: #94A3B8 !important; opacity: 1 !important; }
+
+.stButton > button,
+.stButton > button * {
+    color: #FFFFFF !important;
+}
 .stButton > button {
     background: linear-gradient(to bottom, #059669, #047857) !important;
-    color: #FFFFFF !important;
     border: 1px solid #065F46 !important;
     border-bottom: 4px solid #064E3B !important;
     border-radius: 12px !important;
@@ -89,12 +118,6 @@ html, body, [class*="css"] {
 .stButton > button:active {
     border-bottom-width: 1px !important;
     transform: translateY(3px) !important;
-}
-
-.stTextInput input, .stNumberInput input, .stDateInput input, div[data-baseweb="select"] > div {
-    border-radius: 10px !important;
-    border: 1px solid #CBD5E1 !important;
-    background: #FFFFFF !important;
 }
 
 /* Headers */
@@ -206,10 +229,32 @@ if "adv_form_version" not in st.session_state:
     st.session_state.adv_form_version = 0
 
 # Try to auto-load credentials from Streamlit Secrets if available
-if not st.session_state.cloud_url and "FIREBASE_URL" in st.secrets:
-    st.session_state.cloud_url = st.secrets["FIREBASE_URL"]
-if not st.session_state.cloud_secret and "FIREBASE_SECRET" in st.secrets:
-    st.session_state.cloud_secret = st.secrets["FIREBASE_SECRET"]
+try:
+    if not st.session_state.cloud_url and "FIREBASE_URL" in st.secrets:
+        st.session_state.cloud_url = st.secrets["FIREBASE_URL"]
+    if not st.session_state.cloud_secret and "FIREBASE_SECRET" in st.secrets:
+        st.session_state.cloud_secret = st.secrets["FIREBASE_SECRET"]
+except Exception:
+    pass
+
+# Try to auto-load credentials from local finance_data.json if available
+if not st.session_state.cloud_url:
+    possible_paths = [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "finance_data.json"),
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "finance_data.json"),
+        os.path.join("C:\\Users\\AbhilashBabu", "finance_data.json")
+    ]
+    for p in possible_paths:
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    local_data = json.load(f)
+                    if local_data.get("cloud_sync_enabled", False) and local_data.get("cloud_url", ""):
+                        st.session_state.cloud_url = local_data["cloud_url"]
+                        st.session_state.cloud_secret = local_data.get("cloud_secret", "")
+                        break
+            except Exception:
+                pass
 
 # -----------------------------
 # CONFIGURATION SCREEN
@@ -428,8 +473,14 @@ with tab_q:
     st.markdown("##### Quick Double-Entry transaction")
     
     v = st.session_state.qe_form_version
-    qe_date = st.date_input("📅 Date", value=datetime.now().date(), key=f"qe_date_{v}")
+    raw_date = st.date_input("📅 Date", value=datetime.now().date(), key=f"qe_date_{v}")
     
+    # Handle range date input robustly
+    if isinstance(raw_date, (list, tuple)):
+        qe_date = raw_date[0] if len(raw_date) > 0 else datetime.now().date()
+    else:
+        qe_date = raw_date
+        
     # Suggestion / Narration
     unique_narrations = sorted(list(set([jv.get("narration", "").strip() for jv in d.get("journal_entries", []) if jv.get("narration", "").strip()])))
     if "-- Custom --" not in unique_narrations:
@@ -471,7 +522,7 @@ with tab_q:
     )
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-    qe_submit = st.button("Post Transaction", key="btn_quick_post")
+    qe_submit = st.button("💾 Record Entry", key="btn_quick_post")
 
     if qe_submit:
         if not qe_narration.strip():
@@ -501,16 +552,20 @@ with tab_q:
                 st.success(f"✅ Posted Transaction {next_id} successfully!")
                 st.rerun()
             else:
-                st.error("❌ Failed to push data to cloud database. Try again.")
-
-# ─────────────────────────────────────────────────────────────────────────────
+                st.error("❌ Failed to push data to cloud database. Try again.")# ─────────────────────────────────────────────────────────────────────────────
 # TAB 2 — ADVANCED JV SPLITS EDITOR
 # ─────────────────────────────────────────────────────────────────────────────
 with tab_a:
     st.markdown("##### Advanced Journal Voucher Splits")
     
     v_adv = st.session_state.adv_form_version
-    jv_date = st.date_input("JV Date", value=datetime.now().date(), key=f"jv_new_date_{v_adv}")
+    raw_jv_date = st.date_input("JV Date", value=datetime.now().date(), key=f"jv_new_date_{v_adv}")
+    
+    # Handle range date input robustly
+    if isinstance(raw_jv_date, (list, tuple)):
+        jv_date = raw_jv_date[0] if len(raw_jv_date) > 0 else datetime.now().date()
+    else:
+        jv_date = raw_jv_date
     
     unique_narrations = sorted(list(set([jv.get("narration", "").strip() for jv in d.get("journal_entries", []) if jv.get("narration", "").strip()])))
     if "-- Custom --" not in unique_narrations:
@@ -607,7 +662,7 @@ with tab_a:
         if has_empty_account:
             st.warning("⚠️ Select account names for all non-zero amounts.")
             
-        if st.button("💾 Post Journal Voucher", disabled=has_empty_account, key="btn_post_jv"):
+        if st.button("💾 Record Journal Voucher", disabled=has_empty_account, key="btn_post_jv"):
             next_id = f"JV-{len(d.get('journal_entries', [])) + 1:05d}"
             
             d["journal_entries"].append({
